@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/labstack/gommon/log"
+	"github.com/mileusna/useragent"
 )
 
 type TrackingData struct {
@@ -27,12 +30,18 @@ func trackHandler(w http.ResponseWriter, r *http.Request) {
 	defer w.WriteHeader(http.StatusOK)
 
 	data := r.URL.Query().Get("data")
+	fmt.Println("Base Encoded data ", data)
 	trk, err := decodeData(data)
 	if err != nil {
 		fmt.Print(err)
 	}
+	ua := useragent.Parse(trk.Action.UserAgent)
+	if err = e.Add(trk, ua); err != nil {
+		fmt.Println(err)
+	}
 	fmt.Println("site id", trk.SiteID)
 }
+
 func decodeData(s string) (data Tracking, err error) {
 	b, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
@@ -44,6 +53,11 @@ func decodeData(s string) (data Tracking, err error) {
 }
 
 func main() {
+	err := e.open()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
 	http.HandleFunc("/track", trackHandler)
 	http.ListenAndServe(":9876", nil)
 }
