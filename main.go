@@ -3,11 +3,17 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"flag"
 	"fmt"
+	"log"
 	"net/http"
 
-	"github.com/labstack/gommon/log"
 	"github.com/mileusna/useragent"
+)
+
+var (
+	forceIP         = ""
+	events  *Events = &Events{}
 )
 
 type TrackingData struct {
@@ -26,15 +32,29 @@ type Tracking struct {
 	Action TrackingData `json:"tracking"`
 }
 
-func trackHandler(w http.ResponseWriter, r *http.Request) {
+func main() {
+	flag.StringVar(&forceIP, "ip", "", "force IP for request, useful in local")
+	flag.Parse()
+
+	if err := events.Open(); err != nil {
+		log.Fatal(err)
+	} else if err := events.EnsureTable(); err != nil {
+		log.Fatal(err)
+	}
+
+	http.HandleFunc("/track", track)
+	http.ListenAndServe(":9876", nil)
+}
+
+func track(w http.ResponseWriter, r *http.Request) {
 	defer w.WriteHeader(http.StatusOK)
 
 	data := r.URL.Query().Get("data")
-	fmt.Println("Base Encoded data ", data)
 	trk, err := decodeData(data)
 	if err != nil {
 		fmt.Print(err)
 	}
+
 	ua := useragent.Parse(trk.Action.UserAgent)
 
 	headers := []string{"X-Forward-For", "X-Real-IP"}
@@ -50,10 +70,9 @@ func trackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := e.Add(trk, ua, geoInfo); err != nil {
+	if err := events.Add(trk, ua, geoInfo); err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("site id", trk.SiteID)
 }
 
 func decodeData(s string) (data Tracking, err error) {
@@ -61,17 +80,7 @@ func decodeData(s string) (data Tracking, err error) {
 	if err != nil {
 		return
 	}
+
 	err = json.Unmarshal(b, &data)
 	return
-
-}
-
-func main() {
-	err := e.open()
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-	http.HandleFunc("/track", trackHandler)
-	http.ListenAndServe(":9876", nil)
 }

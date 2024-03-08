@@ -20,7 +20,7 @@ type GeoInfo struct {
 }
 
 func getGeoInfo(ip string) (*GeoInfo, error) {
-	req, err := http.NewRequest("GET", "http://localhost:8080/json?ip="+ip, nil)
+	req, err := http.NewRequest("GET", "http://localhost:8000/json?ip="+ip, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +54,10 @@ func ipFromRequest(headers []string, r *http.Request) (net.IP, error) {
 			return nil, err
 		}
 		remoteIP = host
+	}
+
+	if len(forceIP) > 0 {
+		remoteIP = forceIP
 	}
 
 	ip := net.ParseIP(remoteIP)

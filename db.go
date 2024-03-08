@@ -2,20 +2,18 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	"github.com/mileusna/useragent"
 )
 
-var (
-	e = &Events{}
-)
-
 type Events struct {
-	DB *pgx.Conn
+	DB driver.Conn
 }
 
 type Event struct {
@@ -36,20 +34,78 @@ type Event struct {
 	Timestamp   time.Time
 }
 
-func (e *Events) open() error {
-	conn, err := pgx.Connect(
-		context.Background(),
-		"postgres://postgres:password@localhost:9123/postgres",
-	)
+func (e *Events) Open() error {
+	conn, err := clickhouse.Open(&clickhouse.Options{
+		Addr: []string{"127.0.0.1:9000"},
+		Auth: clickhouse.Auth{
+			Database: "default",
+			Username: "default",
+			Password: "",
+		},
+		Debug: false,
+		Debugf: func(format string, v ...any) {
+			fmt.Printf(format, v)
+		},
+		Settings: clickhouse.Settings{
+			"max_execution_time": 60,
+		},
+		Compression: &clickhouse.Compression{
+			Method: clickhouse.CompressionLZ4,
+		},
+		DialTimeout:          time.Second * 30,
+		MaxOpenConns:         5,
+		MaxIdleConns:         5,
+		ConnMaxLifetime:      time.Duration(10) * time.Minute,
+		ConnOpenStrategy:     clickhouse.ConnOpenInOrder,
+		BlockBufferSize:      10,
+		MaxCompressionBuffer: 10240,
+		ClientInfo: clickhouse.ClientInfo{ // optional, please see Client info section in the README.md
+			Products: []struct {
+				Name    string
+				Version string
+			}{
+				{Name: "my-app", Version: "0.1"},
+			},
+		},
+	})
 	if err != nil {
 		return err
-	} else if err := conn.Ping(context.Background()); err != nil {
+	}
+
+	if err := conn.Ping(context.Background()); err != nil {
 		return err
 	}
 
 	e.DB = conn
 	return nil
 }
+
+func (e *Events) EnsureTable() error {
+	qry := `		
+		CREATE TABLE IF NOT EXISTS events (
+			site_id String NOT NULL,
+			occured_at UInt32 NOT NULL,
+			type String NOT NULL,
+			user_id String NOT NULL,
+			event String NOT NULL,
+			category String NOT NULL,
+			referrer String NOT NULL,
+			is_touch BOOLEAN NOT NULL,
+			browser_name String NOT NULL,
+			os_name String NOT NULL,
+			device_type String NOT NULL,
+			country String NOT NULL,
+			region String NOT NULL,
+			timestamp DateTime DEFAULT now()
+		)
+		ENGINE MergeTree
+		ORDER BY (site_id, occured_at);
+	`
+
+	ctx := context.Background()
+	return e.DB.Exec(ctx, qry)
+}
+
 func (e *Events) Add(trk Tracking, ua useragent.UserAgent, geo *GeoInfo) error {
 	qry := `
 		INSERT INTO events
@@ -72,7 +128,7 @@ func (e *Events) Add(trk Tracking, ua useragent.UserAgent, geo *GeoInfo) error {
 		)
 	`
 
-	_, err := e.DB.Exec(context.Background(), qry,
+	err := e.DB.Exec(context.Background(), qry,
 		trk.SiteID,
 		nowToInt(),
 		trk.Action.Type,
