@@ -6,6 +6,8 @@ services:
     image: postgres:latest
     ports:
       - 9123:5432
+    volumes:
+      - ./:/tmp/data/
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
