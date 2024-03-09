@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/mileusna/useragent"
 )
@@ -23,7 +24,8 @@ type TrackingData struct {
 	Event         string `json:"event"`
 	Category      string `json:"category"`
 	Referrer      string `json:"referrer"`
-	IsTouchDevice bool   `json:"isTouchDevice"`
+	ReferrerHost  string
+	IsTouchDevice bool `json:"isTouchDevice"`
 	OccuredAt     uint32
 }
 
@@ -41,6 +43,8 @@ func main() {
 	} else if err := events.EnsureTable(); err != nil {
 		log.Fatal(err)
 	}
+
+	go events.Run()
 
 	http.HandleFunc("/track", track)
 	http.ListenAndServe(":9876", nil)
@@ -70,9 +74,14 @@ func track(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := events.Add(trk, ua, geoInfo); err != nil {
-		fmt.Println(err)
+	if len(trk.Action.Referrer) > 0 {
+		u, err := url.Parse(trk.Action.Referrer)
+		if err == nil {
+			trk.Action.ReferrerHost = u.Host
+		}
 	}
+
+	go events.Add(trk, ua, geoInfo)
 }
 
 func decodeData(s string) (data Tracking, err error) {
