@@ -13,6 +13,8 @@ import (
 	"github.com/mileusna/useragent"
 )
 
+var ch = make(chan qdata)
+
 type QueryType int
 
 const (
@@ -26,21 +28,23 @@ const (
 	QueryCountry
 )
 
+// TrackingData represents data related to tracking events.
 type TrackingData struct {
-	Type          string `json:"type"`
-	Identity      string `json:"identity"`
-	UserAgent     string `json:"ua"`
-	Event         string `json:"event"`
-	Category      string `json:"category"`
-	Referrer      string `json:"referrer"`
-	ReferrerHost  string
-	IsTouchDevice bool `json:"isTouchDevice"`
-	OccuredAt     uint32
+	Type          string `json:"type"`     // Type of tracking event (e.g., "pageview", "event").
+	Identity      string `json:"identity"` // Identity associated with the event (e.g., user ID, session ID).
+	UserAgent     string `json:"ua"`       // User agent string of the client making the request.
+	Event         string `json:"event"`    // Specific event being tracked (e.g., "event", "submit").
+	Category      string `json:"category"` // Category of the event (e.g., "button", "form").
+	Referrer      string `json:"referrer"` // Referring URL or source of the event.
+	ReferrerHost  string // Hostname extracted from the referring URL.
+	IsTouchDevice bool   `json:"isTouchDevice"` // Indicates whether the client device is a touch-enabled device.
+	OccuredAt     uint32 // Timestamp indicating when the event occurred (Unix timestamp).
 }
 
+// Tracking represents a tracking object with site ID and tracking data.
 type Tracking struct {
-	SiteID string       `json:"site_id"`
-	Action TrackingData `json:"tracking"`
+	SiteID string       `json:"site_id"`  // ID of the site where the tracking event occurred.
+	Action TrackingData `json:"tracking"` // Tracking data associated with the event.
 }
 
 type MetricData struct {
@@ -155,14 +159,14 @@ func (e *Events) EnsureTable() error {
 }
 
 func (e *Events) Add(trk Tracking, ua useragent.UserAgent, geo *GeoInfo) {
-	e.ch <- qdata{trk, ua, geo}
+	ch <- qdata{trk, ua, geo}
 }
 
 func (e *Events) Run() {
 	timer := time.NewTimer(time.Second * 10)
 	for {
 		select {
-		case data := <-e.ch:
+		case data := <-ch:
 			e.lock.Lock()
 			e.q = append(e.q, data)
 			c := len(e.q)
@@ -224,6 +228,7 @@ func (e *Events) Insert() error {
 	ctx := context.Background()
 	batch, err := e.DB.PrepareBatch(ctx, qry)
 	if err != nil {
+		fmt.Println("PrepareBatch err :	", err)
 		return err
 	}
 
@@ -246,6 +251,7 @@ func (e *Events) Insert() error {
 		)
 
 		if err != nil {
+			fmt.Println("tmp err", err)
 			return err
 		}
 	}
