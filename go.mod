@@ -1,4 +1,4 @@
-module github.com/akashnikam25/google_anlytics
+module gotracker
 
 go 1.22.0
 
@@ -6,6 +6,7 @@ require (
 	github.com/ClickHouse/ch-go v0.61.3 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.20.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/gizak/termui/v3 v3.1.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -16,7 +17,10 @@ require (
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/mattn/go-runewidth v0.0.2 // indirect
 	github.com/mileusna/useragent v1.3.4 // indirect
+	github.com/mitchellh/go-wordwrap v0.0.0-20150314170334-ad45545899c7 // indirect
+	github.com/nsf/termbox-go v0.0.0-20190121233118-02980233997d // indirect
 	github.com/paulmach/orb v0.11.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
