@@ -186,7 +186,10 @@ func truncate(keys []int) []int {
 		if last >= total {
 			last = total - 1
 		}
-
+		if offset == last{
+			pos = 0
+			return keys[0:16] // reset settings
+		}
 		return keys[offset:last]
 	}
 	return keys
